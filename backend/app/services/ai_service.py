@@ -103,7 +103,7 @@ def _build_agent(*, api_key: str, db: Session):
         count_all_hcps,
     ]
 
-    llm = ChatGroq(model="gemma2-9b-it", temperature=0, api_key=api_key)
+    llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0, api_key=api_key)
 
     system_prompt = (
         "You are a helpful CRM assistant for managing Healthcare Professional (HCP) interactions. "
