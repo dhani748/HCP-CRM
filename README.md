@@ -30,12 +30,10 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
 # Set environment variables
-export DATABASE_URL="postgresql://username:password@localhost/dbname"
 export GROQ_API_KEY="your_groq_api_key"
 
-# Initialize database
-python -m alembic init migrations
-python -m alembic upgrade head
+# The database is SQLite by default (backend/hcp_crm.db).
+# To use PostgreSQL, set DATABASE_URL in backend/app/database/database.py.
 
 # Start server
 uvicorn app.main:app --reload
@@ -61,15 +59,13 @@ hcp-crm/
 │
 ├── backend/
 │   ├── app/
-│   │   ├── api/            # FastAPI endpoints
-│   │   ├── models/          # SQLAlchemy models
-│   │   ├── schemas/         # Pydantic schemas
-│   │   ├── database/        # Database connection
-│   │   ├── services/        # Application services
-│   │   ├── langgraph/       # LangGraph agents and tools
-│   │   └── main.py          # FastAPI application entry point
-│   ├── migrations/         # Database migrations (created by Alembic)
-│   └── requirements.txt
+│   │   ├── database/              # Database connection and base
+│   │   ├── healthcare_professionals/  # HCP model, DTOs
+│   │   ├── interaction_records/   # Interaction model, routes, DTOs
+│   │   ├── services/              # AI agent (LangGraph + tools)
+│   │   └── main.py                # FastAPI application entry point
+│   ├── requirements.txt
+│   └── hcp_crm.db                 # SQLite database (auto-created)
 └── README.md
 ```
 
@@ -79,7 +75,7 @@ The application features:
 
 1. **Natural Language Processing**: Convert natural language interactions into structured data
 2. **LangGraph Orchestration**: Intent detection, tool selection, and response generation
-3. **LLM Integration**: Groq + Gemma2-9b-it for AI-powered analysis
+3. **LLM Integration**: Groq + llama-3.3-70b-versatile for AI-powered analysis
 4. **Multi-tool Support**: Five dedicated tools for interaction management
 
 ## Key Features
@@ -90,22 +86,10 @@ The application features:
 - **HCP Profiles**: Search and manage healthcare professional profiles
 - **Follow-up Recommendations**: AI-generated next visit suggestions
 
-## Development
-
-Use `rm -rf frontend backend/` to start over with a clean slate.
-
-## Production Deployment
-
-See deployment guides in each module's README or documentation folder.
-
 ## Technologies Used
 
 **Frontend**: React 19, Redux Toolkit, React Router, Axios, TailwindCSS, Google Inter Font, React Hook Form, Framer Motion, Lucide Icons
 
-**Backend**: FastAPI, SQLAlchemy, PostgreSQL, Pydantic, Alembic
+**Backend**: FastAPI, SQLAlchemy, SQLite/PostgreSQL, Pydantic
 
-**AI**: LangGraph, LangChain, Groq API, Gemma2-9b-it
-
-## License
-
-This project is part of an interview assignment.
+**AI**: LangGraph, LangChain, Groq API, llama-3.3-70b-versatile
