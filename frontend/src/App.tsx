@@ -6,6 +6,7 @@ import AppLayout from './layouts/AppLayout';
 import Dashboard from './pages/Dashboard';
 import HCPList from './pages/hcp/List';
 import InteractionList from './pages/interactions/List';
+import Assistant from './pages/assistant/Assistant';
 
 const AppContent: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -32,6 +33,7 @@ const AppContent: React.FC = () => {
       <Route path="/" element={<Dashboard />} />
       <Route path="/hcp" element={<HCPList />} />
       <Route path="/interactions" element={<InteractionList />} />
+      <Route path="/assistant" element={<Assistant />} />
       <Route path="*" element={
         <div style={{ textAlign: 'center', paddingTop: '4rem', color: 'var(--color-text-muted)' }}>
           <h2>404 — Page not found</h2>

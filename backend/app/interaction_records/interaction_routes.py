@@ -1,5 +1,6 @@
 # backend/app/interaction_records/interaction_routes.py
 from fastapi import Depends, HTTPException, status, APIRouter
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
@@ -23,14 +24,18 @@ router = APIRouter(prefix="/api/v1", tags=["v1"])
 
 # ── Chat ─────────────────────────────────────────────────────────────────────
 
+class ChatRequest(BaseModel):
+    message: str
+
+
 @router.post("/chat", response_model=dict, tags=["Chat"])
 async def send_chat_message(
-    message: str,
+    payload: ChatRequest,
     db: Session = Depends(get_db),
 ):
     """Send a message to the AI assistant and receive a reply."""
     from ..services.ai_service import process_ai_message
-    return await process_ai_message(message, db)
+    return await process_ai_message(payload.message, db)
 
 
 # ── Interaction Records ──────────────────────────────────────────────────────

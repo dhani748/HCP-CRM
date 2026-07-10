@@ -5,6 +5,7 @@ const navItems = [
   { to: '/', label: 'Dashboard', icon: 'D' },
   { to: '/hcp', label: 'HCPs', icon: 'H' },
   { to: '/interactions', label: 'Interactions', icon: 'I' },
+  { to: '/assistant', label: 'AI Assistant', icon: 'AI' },
 ];
 
 const Sidebar: React.FC = () => {
