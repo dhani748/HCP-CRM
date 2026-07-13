@@ -24,14 +24,14 @@ const AIChatWidget: React.FC = () => {
     const content = chatInput.trim();
     if (!content) return;
     dispatch(addMessage({ role: 'user', content, timestamp: new Date().toISOString() }));
-    dispatch(sendAgentMessage(content));
+    dispatch(sendAgentMessage({ message: content }));
     setChatInput('');
   }, [chatInput, dispatch]);
 
   const handleRetry = useCallback(() => {
     const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
     if (lastUserMsg) {
-      dispatch(sendAgentMessage(lastUserMsg.content));
+      dispatch(sendAgentMessage({ message: lastUserMsg.content }));
     }
   }, [dispatch, messages]);
 

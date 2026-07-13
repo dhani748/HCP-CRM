@@ -14,6 +14,7 @@ export interface ChatState {
   toolExecutionStatus: string;
   toolOutput: Record<string, unknown> | null;
   updatedFields: string[];
+  editingInteractionId: number | null;
 }
 
 const initialState: ChatState = {
@@ -26,15 +27,16 @@ const initialState: ChatState = {
   toolExecutionStatus: '',
   toolOutput: null,
   updatedFields: [],
+  editingInteractionId: null,
 };
 
 export const sendAgentMessage = createAsyncThunk<
   AgentChatResponse,
-  string,
+  { message: string; editingInteractionId?: number | null },
   { rejectValue: string }
->('chat/sendAgentMessage', async (message: string, { rejectWithValue }) => {
+>('chat/sendAgentMessage', async ({ message, editingInteractionId }, { rejectWithValue }) => {
   try {
-    const response = await agentChatService(message);
+    const response = await agentChatService(message, editingInteractionId);
     return response;
   } catch (err) {
     return rejectWithValue(err instanceof Error ? err.message : 'Failed to send message');
@@ -55,6 +57,7 @@ const chatSlice = createSlice({
       state.toolExecutionStatus = '';
       state.toolOutput = null;
       state.updatedFields = [];
+      state.editingInteractionId = null;
     },
     setTyping: (state, action: PayloadAction<boolean>) => {
       state.isTyping = action.payload;
@@ -67,6 +70,9 @@ const chatSlice = createSlice({
       state.toolExecutionStatus = '';
       state.toolOutput = null;
       state.updatedFields = [];
+    },
+    setEditingInteractionId: (state, action: PayloadAction<number | null>) => {
+      state.editingInteractionId = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -92,6 +98,7 @@ const chatSlice = createSlice({
         state.toolExecutionStatus = action.payload.execution_status;
         state.toolOutput = action.payload.tool_output as Record<string, unknown> | null;
         state.updatedFields = action.payload.updated_fields || [];
+        state.editingInteractionId = action.payload.editing_interaction_id ?? null;
         state.unreadCount += 1;
       })
       .addCase(sendAgentMessage.rejected, (state, action) => {
@@ -103,7 +110,7 @@ const chatSlice = createSlice({
   },
 });
 
-export const { addMessage, clearChat, setTyping, resetUnread, resetToolState } = chatSlice.actions;
+export const { addMessage, clearChat, setTyping, resetUnread, resetToolState, setEditingInteractionId } = chatSlice.actions;
 
 export const selectChatMessages = (state: RootState) => state.chat.messages;
 export const selectChatLoading = (state: RootState) => state.chat.loading;
@@ -114,5 +121,6 @@ export const selectCurrentTool = (state: RootState) => state.chat.currentTool;
 export const selectToolExecutionStatus = (state: RootState) => state.chat.toolExecutionStatus;
 export const selectToolOutput = (state: RootState) => state.chat.toolOutput;
 export const selectUpdatedFields = (state: RootState) => state.chat.updatedFields;
+export const selectEditingInteractionId = (state: RootState) => state.chat.editingInteractionId;
 
 export default chatSlice.reducer;

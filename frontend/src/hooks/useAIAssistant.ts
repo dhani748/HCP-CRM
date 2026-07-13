@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { useAppDispatch } from './useAppDispatch';
 import { setExtractedInteraction, setExtractedHCP } from '../redux/slices/aiExtractSlice';
-import { extractInteraction, extractHCP, sendChatMessage } from '../services/aiService';
+import { extractInteraction, extractHCP, agentChatService } from '../services/aiService';
 import { parseHCPFromText } from '../utils/hcpParser';
 import type { ParsedHCP } from '../utils/hcpParser';
 import type { ExtractedHCP } from '../services/aiService';
@@ -86,7 +86,7 @@ export function useAIAssistant(currentPage: string, onNavigate?: (path: string) 
             : '';
           addMessage('assistant', `**Interaction extracted.**\n\nThe form has been populated. Please review before saving.${summary ? `\n\n**Summary:** ${summary}` : ''}${materials}${followUp}`);
         } else {
-          const reply = await sendChatMessage(trimmed, currentPage);
+          const reply = await agentChatService(trimmed);
           addMessage('assistant', reply.reply);
         }
       } else if (createHCPIntent) {
@@ -96,7 +96,7 @@ export function useAIAssistant(currentPage: string, onNavigate?: (path: string) 
           if (onNavigate) onNavigate('/hcp/new');
           addMessage('assistant', formatHCPResult(result));
         } else {
-          const reply = await sendChatMessage(trimmed, currentPage);
+          const reply = await agentChatService(trimmed);
           addMessage('assistant', reply.reply);
         }
       } else if (createInteractionIntent) {
@@ -113,11 +113,11 @@ export function useAIAssistant(currentPage: string, onNavigate?: (path: string) 
             : '';
           addMessage('assistant', `**Interaction extracted.**\n\nThe form has been populated. Please review before saving.${summary ? `\n\n**Summary:** ${summary}` : ''}${materials}${followUp}`);
         } else {
-          const reply = await sendChatMessage(trimmed, currentPage);
+          const reply = await agentChatService(trimmed);
           addMessage('assistant', reply.reply);
         }
       } else {
-        const reply = await sendChatMessage(trimmed, currentPage);
+        const reply = await agentChatService(trimmed);
         addMessage('assistant', reply.reply);
       }
     } catch (err) {

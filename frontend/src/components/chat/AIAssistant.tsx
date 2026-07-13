@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from '../../hooks';
-import { sendAgentMessage, clearChat, selectChatTyping, addMessage } from '../../redux/slices/chatSlice';
+import { sendAgentMessage, clearChat, selectChatTyping, addMessage, selectEditingInteractionId } from '../../redux/slices/chatSlice';
 import { updateInteractionFromTool, selectCurrentInteraction } from '../../redux/slices/interactionSlice';
 import { selectEditingSession, EditingMode } from '../../redux/slices/editingSessionSlice';
 import ChatHeader from './ChatHeader';
@@ -19,6 +19,7 @@ const AIAssistant: React.FC = () => {
   const updatedFields = useAppSelector((s) => s.chat.updatedFields);
   const session = useAppSelector(selectEditingSession);
   const interaction = useAppSelector(selectCurrentInteraction);
+  const editingInteractionId = useAppSelector(selectEditingInteractionId);
   const [input, setInput] = useState('');
   const prevMode = useRef<EditingMode>('idle');
 
@@ -53,7 +54,7 @@ const AIAssistant: React.FC = () => {
     });
 
     try {
-      const result = await dispatch(sendAgentMessage(text)).unwrap();
+      const result = await dispatch(sendAgentMessage({ message: text, editingInteractionId })).unwrap();
       if (result.tool_executed !== 'none' && result.interaction_state) {
         dispatch(updateInteractionFromTool(result.interaction_state as Record<string, unknown>));
       }

@@ -30,25 +30,9 @@ class ExtractInteractionRequest(BaseModel):
 
 
 @router.post("/ai/extract-interaction", tags=["AI"])
-async def extract_interaction(
-    payload: ExtractInteractionRequest,
-):
+async def extract_interaction(payload: ExtractInteractionRequest):
     from ..services.ai_service import process_extract_interaction
     return await process_extract_interaction(payload.text)
-
-
-class ChatRequest(BaseModel):
-    message: str
-    current_page: str = ""
-
-
-@router.post("/chat", response_model=dict, tags=["Chat"])
-async def send_chat_message(
-    payload: ChatRequest,
-    db: Session = Depends(get_db),
-):
-    from ..services.ai_service import process_ai_message
-    return await process_ai_message(payload.message, db, current_page=payload.current_page)
 
 
 class ExtractHCPRequest(BaseModel):
@@ -56,9 +40,7 @@ class ExtractHCPRequest(BaseModel):
 
 
 @router.post("/ai/extract-hcp", tags=["AI"])
-async def extract_hcp(
-    payload: ExtractHCPRequest,
-):
+async def extract_hcp(payload: ExtractHCPRequest):
     from ..services.ai_service import process_extract_hcp
     return await process_extract_hcp(payload.text)
 
@@ -203,7 +185,6 @@ async def delete_interaction_record(interaction_id: int, db: Session = Depends(g
     interaction_record = db.query(InteractionRecord).filter(InteractionRecord.id == interaction_id).first()
     if not interaction_record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Interaction Record not found")
-
     db.delete(interaction_record)
     db.commit()
 

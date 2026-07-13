@@ -29,6 +29,7 @@ class InteractionRecord(Base):
     reminder_date = Column(String, default="")
     tags = Column(JSON, default=list)
     attachments = Column(JSON, default=list)
+    attendees = Column(JSON, default=list)
     interaction_summary = Column(Text, default="")
     ai_confidence_score = Column(Float, default=0.0)
     created_by = Column(String, default="AI Assistant")

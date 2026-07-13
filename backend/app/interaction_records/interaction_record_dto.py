@@ -1,7 +1,19 @@
 from pydantic import BaseModel, ConfigDict, field_validator
-from typing import List, Optional
+from typing import List, Optional, Any
 from datetime import datetime
-import json
+
+
+def _ensure_list(value: Any) -> Any:
+    if value is None:
+        return None
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        value = value.strip()
+        if not value:
+            return []
+        return [value]
+    return value
 
 
 class InteractionRecordBase(BaseModel):
@@ -31,12 +43,13 @@ class InteractionRecordBase(BaseModel):
     interaction_status: Optional[str] = "draft"
     status: Optional[str] = "draft"
 
-    @field_validator("products_discussed", "objections_raised", "materials_shared", "tags", "attachments", mode="before")
+    @field_validator(
+        "products_discussed", "objections_raised", "materials_shared",
+        "tags", "attachments", mode="before"
+    )
     @classmethod
-    def _parse_json_fields(cls, value: object) -> object:
-        if value is not None and isinstance(value, str):
-            return json.loads(value)
-        return value
+    def _normalize_list_fields(cls, value: Any) -> Any:
+        return _ensure_list(value)
 
 
 class CreateInteractionRecordRequest(InteractionRecordBase):
@@ -63,12 +76,21 @@ class UpdateInteractionRecordRequest(BaseModel):
     reminder_date: Optional[str] = None
     tags: Optional[List[str]] = None
     attachments: Optional[List[str]] = None
+    attendees: Optional[List[str]] = None
     interaction_summary: Optional[str] = None
     ai_confidence_score: Optional[float] = None
     created_by: Optional[str] = None
     tool_used: Optional[str] = None
     interaction_status: Optional[str] = None
     status: Optional[str] = None
+
+    @field_validator(
+        "products_discussed", "objections_raised", "materials_shared",
+        "tags", "attachments", "attendees", mode="before"
+    )
+    @classmethod
+    def _normalize_list_fields(cls, value: Any) -> Any:
+        return _ensure_list(value)
 
 
 class InteractionRecordResponse(InteractionRecordBase):

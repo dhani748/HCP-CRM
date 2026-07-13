@@ -1,6 +1,18 @@
-from pydantic import BaseModel
-from typing import List, Optional
-from datetime import datetime
+from pydantic import BaseModel, field_validator
+from typing import List, Any
+
+
+def _ensure_list(value: Any) -> list:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        value = value.strip()
+        if not value:
+            return []
+        return [value]
+    return []
 
 
 class InteractionState(BaseModel):
@@ -22,11 +34,20 @@ class InteractionState(BaseModel):
     reminder_date: str = ""
     tags: List[str] = []
     attachments: List[str] = []
+    attendees: List[str] = []
     interaction_summary: str = ""
     ai_confidence_score: float = 0.0
     created_by: str = "AI Assistant"
     tool_used: str = ""
     interaction_status: str = "draft"
+
+    @field_validator(
+        "products_discussed", "objections_raised", "materials_shared",
+        "tags", "attachments", "attendees", mode="before"
+    )
+    @classmethod
+    def _normalize_lists(cls, value: Any) -> list:
+        return _ensure_list(value)
 
 
 class ToolOutput(BaseModel):

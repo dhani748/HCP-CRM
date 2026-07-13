@@ -32,6 +32,7 @@ export interface AgentChatResponse {
   search_results: Record<string, unknown>[];
   history_results: Record<string, unknown>[];
   execution_status: string;
+  editing_interaction_id: number | null;
 }
 
 export const extractInteraction = async (text: string): Promise<ExtractedInteraction> => {
@@ -44,12 +45,10 @@ export const extractHCP = async (text: string): Promise<ExtractedHCP> => {
   return response.data;
 };
 
-export const agentChatService = async (message: string): Promise<AgentChatResponse> => {
-  const response = await apiService.post<AgentChatResponse>('/ai/agent/chat', { message });
-  return response.data;
-};
-
-export const sendChatMessage = async (message: string, currentPage: string = ''): Promise<{ reply: string }> => {
-  const response = await apiService.post<{ reply: string }>('/chat', { message, current_page: currentPage });
+export const agentChatService = async (message: string, editingInteractionId?: number | null): Promise<AgentChatResponse> => {
+  const response = await apiService.post<AgentChatResponse>('/ai/agent/chat', {
+    message,
+    editing_interaction_id: editingInteractionId ?? null,
+  });
   return response.data;
 };
