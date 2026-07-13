@@ -30,7 +30,7 @@ const Navbar: React.FC = () => {
             border: 'none',
             color: 'var(--color-text-muted)',
             fontSize: '1.25rem',
-            display: 'none',
+            cursor: 'pointer',
           }}
         >
           =

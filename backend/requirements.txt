@@ -1,35 +1,13 @@
-{
-  "name": "hcp-crm-backend",
-  "version": "0.1.0",
-  "description": "AI-powered CRM for logging interactions with Healthcare Professionals",
-  "main": "app/main.py",
-  "scripts": {
-    "dev": "uvicorn app.main:app --reload --host 0.0.0.0 --port 8000",
-    "start": "uvicorn app.main:app --host 0.0.0.0 --port 8000",
-    "test": "pytest",
-    "lint": "ruff check app/",
-    "typecheck": "mypy app/",
-    "db:migrate": "alembic revision --autogenerate -m",
-    "db:upgrade": "alembic upgrade head",
-    "db:down": "alembic downgrade -1"
-  },
-  "dependencies": {
-    "fastapi": "^0.110.0",
-    "uvicorn": "^0.30.0",
-    "sqlalchemy": "^2.0.0",
-    "postgresql": "^1.0.0",
-    "pydantic": "^2.0.0",
-    "alembic": "^1.13.0",
-    "python-multipart": "^0.0.6",
-    "langgraph": "^0.1.0",
-    "langchain": "^0.1.0",
-    "groq": "^0.1.0",
-    "python-dotenv": "^1.0.0"
-  },
-  "devDependencies": {
-    "ruff": "^0.4.0",
-    "mypy": "^1.0.0",
-    "pytest": "^8.0.0",
-    "pytest-asyncio": "^0.21.0"
-  }
-}
+fastapi>=0.110.0
+uvicorn>=0.30.0
+sqlalchemy>=2.0.0
+pydantic>=2.0.0
+alembic>=1.13.0
+python-multipart>=0.0.6
+langgraph>=0.1.0
+langchain>=0.1.0
+langchain-groq>=0.1.0
+langchain-core>=0.1.0
+groq>=0.1.0
+python-dotenv>=1.0.0
+httpx>=0.27.0

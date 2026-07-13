@@ -1,5 +1,5 @@
 # backend/app/healthcare_professionals/healthcare_professional.py
-from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy import Column, Integer, String, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -18,6 +18,7 @@ class HealthcareProfessional(Base):
     city = Column(String)
     email = Column(String)
     phone = Column(String)
+    active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     interactions = relationship("InteractionRecord", back_populates="healthcare_professional")

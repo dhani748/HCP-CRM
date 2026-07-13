@@ -1,5 +1,3 @@
-// frontend/src/types/index.ts
-
 export interface HCP {
   id: string;
   name: string;
@@ -13,26 +11,35 @@ export interface HCP {
   updatedAt?: string;
 }
 
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-}
-
 export interface Interaction {
   id: string;
   hcpId: string;
+  hcpName: string;
   interactionType: string;
-  date: string;
-  time: string;
-  attendees: string[];
-  discussion: string[];
-  materials: string[];
-  samples: number;
-  sentiment: 'positive' | 'neutral' | 'negative';
-  outcomes: string[];
-  followUp: string;
-  summary?: string;
+  interactionDate: string;
+  interactionTime: string;
+  attendees: string;
+  hospital: string;
+  specialization: string;
+  topicsDiscussed: string;
+  discussionNotes: string;
+  materialsShared: string[];
+  samplesDistributed: string[];
+  sentiment: string;
+  outcomes: string;
+  followUpActions: string;
+  followUpRequired: boolean;
+  followUpDate: string;
+  reminderDate: string;
+  priority: string;
+  tags: string[];
+  aiSuggestedFollowUp: string;
+  aiGeneratedSummary: string;
+  interactionSummary: string;
+  interactionStatus: string;
+  toolUsed: string;
+  lastUpdated: string;
+  aiConfidenceScore: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -41,6 +48,14 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
+}
+
+export interface ToolExecution {
+  toolName: string;
+  success: boolean;
+  message: string;
+  updatedFields: string[];
+  interactionState: Partial<Interaction> | null;
 }
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';

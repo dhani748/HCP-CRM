@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import { createHCP, updateHCP, selectHCPSaving } from '../../redux/slices/hcpSlice';
 import { showToast } from '../../redux/slices/uiSlice';
+import { clearExtraction } from '../../redux/slices/aiExtractSlice';
 import type { HCP } from '../../types';
 
 interface HCPFormProps {
@@ -10,9 +11,12 @@ interface HCPFormProps {
   onCancel: () => void;
 }
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const HCPForm: React.FC<HCPFormProps> = ({ hcp, onSuccess, onCancel }) => {
   const dispatch = useAppDispatch();
   const saving = useAppSelector(selectHCPSaving);
+  const extractedHCP = useAppSelector(state => state.aiExtract?.extractedHCP);
 
   const [name, setName] = useState(hcp?.name || '');
   const [specialty, setSpecialty] = useState(hcp?.specialty || '');
@@ -21,10 +25,37 @@ const HCPForm: React.FC<HCPFormProps> = ({ hcp, onSuccess, onCancel }) => {
   const [email, setEmail] = useState(hcp?.email || '');
   const [phone, setPhone] = useState(hcp?.phone || '');
   const [active, setActive] = useState(hcp?.active !== false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!extractedHCP || hcp) return;
+
+    if (extractedHCP.name) setName(prev => prev || extractedHCP.name);
+    if (extractedHCP.specialty) setSpecialty(prev => prev || extractedHCP.specialty);
+    if (extractedHCP.hospital) setHospital(prev => prev || extractedHCP.hospital);
+    if (extractedHCP.city) setCity(prev => prev || extractedHCP.city);
+    if (extractedHCP.email) setEmail(prev => prev || extractedHCP.email);
+    if (extractedHCP.phone) setPhone(prev => prev || extractedHCP.phone);
+  }, [extractedHCP, hcp]);
+
+  const validate = (): boolean => {
+    const next: Record<string, string> = {};
+    if (!name.trim()) {
+      next.name = 'Name is required';
+    }
+    if (email && !EMAIL_REGEX.test(email)) {
+      next.email = 'Invalid email format';
+    }
+    if (phone && !/^[\d\s\-+()]{6,20}$/.test(phone)) {
+      next.phone = 'Invalid phone number';
+    }
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!validate()) return;
 
     const data = {
       name: name.trim(),
@@ -36,15 +67,19 @@ const HCPForm: React.FC<HCPFormProps> = ({ hcp, onSuccess, onCancel }) => {
       active,
     };
 
-    if (hcp) {
-      await dispatch(updateHCP({ id: hcp.id, data }));
-      dispatch(showToast({ message: 'HCP updated successfully', type: 'success' }));
-    } else {
-      await dispatch(createHCP(data));
-      dispatch(showToast({ message: 'HCP created successfully', type: 'success' }));
+    try {
+      if (hcp) {
+        await dispatch(updateHCP({ id: hcp.id, data })).unwrap();
+        dispatch(showToast({ message: 'HCP updated successfully', type: 'success' }));
+      } else {
+        await dispatch(createHCP(data)).unwrap();
+        dispatch(showToast({ message: 'HCP created successfully', type: 'success' }));
+      }
+      dispatch(clearExtraction());
+      onSuccess();
+    } catch {
+      dispatch(showToast({ message: 'Failed to save HCP', type: 'error' }));
     }
-
-    onSuccess();
   };
 
   return (
@@ -57,9 +92,10 @@ const HCPForm: React.FC<HCPFormProps> = ({ hcp, onSuccess, onCancel }) => {
           value={name}
           onChange={e => setName(e.target.value)}
           required
-          style={inputStyle}
+          style={{ ...inputStyle, borderColor: errors.name ? 'var(--color-error)' : undefined }}
           placeholder="Dr. John Doe"
         />
+        {errors.name && <span style={errorStyle}>{errors.name}</span>}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
@@ -98,9 +134,10 @@ const HCPForm: React.FC<HCPFormProps> = ({ hcp, onSuccess, onCancel }) => {
           <input
             value={phone}
             onChange={e => setPhone(e.target.value)}
-            style={inputStyle}
+            style={{ ...inputStyle, borderColor: errors.phone ? 'var(--color-error)' : undefined }}
             placeholder="+1 555-0123"
           />
+          {errors.phone && <span style={errorStyle}>{errors.phone}</span>}
         </div>
       </div>
 
@@ -110,9 +147,10 @@ const HCPForm: React.FC<HCPFormProps> = ({ hcp, onSuccess, onCancel }) => {
           type="email"
           value={email}
           onChange={e => setEmail(e.target.value)}
-          style={inputStyle}
+          style={{ ...inputStyle, borderColor: errors.email ? 'var(--color-error)' : undefined }}
           placeholder="john@hospital.com"
         />
+        {errors.email && <span style={errorStyle}>{errors.email}</span>}
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -150,7 +188,7 @@ const HCPForm: React.FC<HCPFormProps> = ({ hcp, onSuccess, onCancel }) => {
             background: 'var(--color-primary)',
             border: 'none',
             borderRadius: 'var(--radius)',
-            color: '#fff',
+            color: 'var(--color-text-inverse)',
             fontSize: '0.875rem',
             fontWeight: 500,
             opacity: saving || !name.trim() ? 0.6 : 1,
@@ -179,6 +217,12 @@ const inputStyle: React.CSSProperties = {
   background: 'var(--color-bg)',
   color: 'var(--color-text)',
   fontSize: '0.875rem',
+};
+
+const errorStyle: React.CSSProperties = {
+  color: 'var(--color-error)',
+  fontSize: '0.75rem',
+  marginTop: '0.25rem',
 };
 
 export default HCPForm;

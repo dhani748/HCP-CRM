@@ -48,7 +48,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             background: 'var(--color-error)',
             border: 'none',
             borderRadius: 'var(--radius)',
-            color: '#fff',
+            color: 'var(--color-text-inverse)',
             fontSize: '0.875rem',
             fontWeight: 500,
             opacity: loading ? 0.6 : 1,

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import {
   fetchInteractions,
@@ -6,15 +7,15 @@ import {
   selectAllInteractions,
   selectInteractionLoading,
   selectInteractionSaving,
+  setCurrentInteraction,
 } from '../../redux/slices/interactionSlice';
+import { startCreateSession, startEditSession } from '../../redux/slices/editingSessionSlice';
 import { selectAllHCPs, fetchHCPs } from '../../redux/slices/hcpSlice';
 import { showToast } from '../../redux/slices/uiSlice';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import ErrorMessage from '../../components/ErrorMessage';
 import EmptyState from '../../components/EmptyState';
-import Modal from '../../components/Modal';
 import ConfirmDialog from '../../components/ConfirmDialog';
-import InteractionForm from './Form';
 import type { Interaction } from '../../types';
 
 const typeIcons: Record<string, string> = {
@@ -38,52 +39,76 @@ const typeBgs: Record<string, string> = {
   meeting: 'var(--color-primary-light)',
 };
 
+type QuickFilter = 'all' | 'today' | 'pending-followup' | 'completed';
+
 const InteractionList: React.FC = () => {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const interactions = useAppSelector(selectAllInteractions);
   const loading = useAppSelector(selectInteractionLoading);
   const saving = useAppSelector(selectInteractionSaving);
   const error = useAppSelector(s => s.interaction.error);
   const hcps = useAppSelector(selectAllHCPs);
 
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<Interaction | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Interaction | null>(null);
   const [typeFilter, setTypeFilter] = useState('');
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
-    dispatch(fetchInteractions());
+    const params: Record<string, string> = {};
+    if (quickFilter === 'today') {
+      params.startDate = new Date().toISOString().split('T')[0];
+    }
+    if (startDate && endDate) {
+      params.startDate = startDate;
+      params.endDate = endDate;
+    }
+    if (typeFilter) {
+      params.interactionType = typeFilter;
+    }
+    dispatch(fetchInteractions(params));
     dispatch(fetchHCPs());
-  }, [dispatch]);
+  }, [dispatch, quickFilter, startDate, endDate, typeFilter]);
 
-  const getHCPName = (hcpId: string) => {
-    const hcp = hcps.find(h => h.id === hcpId);
-    return hcp?.name || hcpId;
+  const getHCPName = (hcpId: string | number) => {
+    const id = String(hcpId);
+    const hcp = hcps.find(h => String(h.id) === id);
+    return hcp?.name || id;
   };
 
-  const filtered = typeFilter
-    ? interactions.filter(i => i.interactionType === typeFilter)
-    : interactions;
+  const filtered = interactions.filter(i => {
+    if (quickFilter === 'pending-followup' && !i.followUpDate) return false;
+    if (quickFilter === 'completed' && i.interactionStatus !== 'completed') return false;
+    return true;
+  });
 
   const sorted = [...filtered].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    (a, b) => new Date(b.interactionDate || b.createdAt).getTime() - new Date(a.interactionDate || a.createdAt).getTime()
   );
 
   const openCreate = () => {
-    setEditing(null);
-    setFormOpen(true);
+    dispatch(setCurrentInteraction(null));
+    dispatch(startCreateSession());
+    navigate('/');
   };
 
   const openEdit = (interaction: Interaction) => {
-    setEditing(interaction);
-    setFormOpen(true);
+    dispatch(setCurrentInteraction(interaction));
+    dispatch(startEditSession(Number(interaction.id)));
+    navigate('/');
   };
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    await dispatch(deleteInteraction(deleteTarget.id));
-    dispatch(showToast({ message: 'Interaction deleted', type: 'success' }));
-    setDeleteTarget(null);
+    try {
+      await dispatch(deleteInteraction(deleteTarget.id)).unwrap();
+      dispatch(showToast({ message: 'Interaction deleted', type: 'success' }));
+      setDeleteTarget(null);
+    } catch {
+      dispatch(showToast({ message: 'Failed to delete interaction', type: 'error' }));
+    }
   };
 
   if (loading && interactions.length === 0) return <LoadingSpinner />;
@@ -104,7 +129,7 @@ const InteractionList: React.FC = () => {
             Interactions
           </h1>
           <p style={{ color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
-            {filtered.length} interactions recorded
+            {sorted.length} interactions recorded
           </p>
         </div>
         <button
@@ -112,7 +137,7 @@ const InteractionList: React.FC = () => {
           style={{
             padding: '0.5rem 1rem',
             background: 'var(--color-primary)',
-            color: '#fff',
+            color: 'var(--color-text-inverse)',
             border: 'none',
             borderRadius: 'var(--radius)',
             fontWeight: 500,
@@ -123,17 +148,66 @@ const InteractionList: React.FC = () => {
         </button>
       </div>
 
-      <div style={{ marginBottom: '1rem' }}>
-        <select
-          value={typeFilter}
-          onChange={e => setTypeFilter(e.target.value)}
+      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+          {(['all', 'today', 'pending-followup', 'completed'] as QuickFilter[]).map(f => (
+            <button
+              key={f}
+              onClick={() => { setQuickFilter(f); setStartDate(''); setEndDate(''); }}
+              style={{
+                padding: '0.375rem 0.75rem',
+                borderRadius: '999px',
+                border: '1px solid var(--color-border)',
+                background: quickFilter === f ? 'var(--color-primary)' : 'transparent',
+                color: quickFilter === f ? 'var(--color-text-inverse)' : 'var(--color-text-muted)',
+                fontSize: '0.8rem',
+                fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              {f === 'all' ? 'All' : f === 'today' ? 'Today' : f === 'pending-followup' ? 'Pending Follow-up' : 'Completed'}
+            </button>
+          ))}
+        </div>
+        <input
+          type="date"
+          value={startDate}
+          onChange={e => { setStartDate(e.target.value); setQuickFilter('all'); }}
           style={{
-            padding: '0.5rem 0.75rem',
+            padding: '0.375rem 0.5rem',
             border: '1px solid var(--color-border)',
             borderRadius: 'var(--radius)',
             background: 'var(--color-surface)',
             color: 'var(--color-text)',
-            fontSize: '0.875rem',
+            fontSize: '0.8rem',
+          }}
+          placeholder="Start date"
+        />
+        <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>to</span>
+        <input
+          type="date"
+          value={endDate}
+          onChange={e => { setEndDate(e.target.value); setQuickFilter('all'); }}
+          style={{
+            padding: '0.375rem 0.5rem',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius)',
+            background: 'var(--color-surface)',
+            color: 'var(--color-text)',
+            fontSize: '0.8rem',
+          }}
+          placeholder="End date"
+        />
+        <select
+          value={typeFilter}
+          onChange={e => setTypeFilter(e.target.value)}
+          style={{
+            padding: '0.375rem 0.5rem',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius)',
+            background: 'var(--color-surface)',
+            color: 'var(--color-text)',
+            fontSize: '0.8rem',
           }}
         >
           <option value="">All Types</option>
@@ -154,7 +228,7 @@ const InteractionList: React.FC = () => {
               style={{
                 padding: '0.5rem 1rem',
                 background: 'var(--color-primary)',
-                color: '#fff',
+                color: 'var(--color-text-inverse)',
                 border: 'none',
                 borderRadius: 'var(--radius)',
                 fontWeight: 500,
@@ -222,6 +296,17 @@ const InteractionList: React.FC = () => {
                     }}>
                       {type}
                     </span>
+                    <span style={{
+                      padding: '0.125rem 0.5rem',
+                      borderRadius: '999px',
+                      fontSize: '0.7rem',
+                      fontWeight: 500,
+                      background: (interaction.interactionStatus || 'draft') === 'completed' ? 'var(--color-success-light)' : 'var(--color-warning-light)',
+                      color: (interaction.interactionStatus || 'draft') === 'completed' ? 'var(--color-success)' : 'var(--color-warning)',
+                      textTransform: 'capitalize',
+                    }}>
+                      {interaction.interactionStatus || 'draft'}
+                    </span>
                     {interaction.sentiment && (
                       <span style={{
                         fontSize: '0.75rem',
@@ -237,48 +322,29 @@ const InteractionList: React.FC = () => {
                     color: 'var(--color-text-muted)',
                     marginBottom: '0.25rem',
                   }}>
-                    {new Date(interaction.date).toLocaleDateString('en-US', {
+                    {new Date(interaction.interactionDate || interaction.createdAt).toLocaleDateString('en-US', {
                       weekday: 'short',
                       year: 'numeric',
                       month: 'short',
                       day: 'numeric',
                     })}
-                    {interaction.time ? ` at ${interaction.time}` : ''}
+                    {interaction.interactionTime ? ` at ${interaction.interactionTime}` : ''}
                   </p>
 
-                  {interaction.discussion && interaction.discussion.length > 0 && (
+                  {interaction.discussionNotes && (
                     <p style={{ fontSize: '0.85rem', marginTop: '0.25rem' }}>
-                      {interaction.discussion.join(', ')}
+                      {interaction.discussionNotes}
                     </p>
                   )}
 
-                  {interaction.followUp && (
+                  {interaction.followUpDate && (
                     <p style={{
                       fontSize: '0.8rem',
                       marginTop: '0.25rem',
                       color: 'var(--color-warning)',
                     }}>
-                      Follow-up: {new Date(interaction.followUp).toLocaleDateString()}
+                      Follow-up: {new Date(interaction.followUpDate).toLocaleDateString()}
                     </p>
-                  )}
-
-                  {interaction.outcomes && interaction.outcomes.length > 0 && (
-                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-                      {interaction.outcomes.map((outcome, i) => (
-                        <span
-                          key={i}
-                          style={{
-                            fontSize: '0.75rem',
-                            padding: '0.125rem 0.5rem',
-                            background: 'var(--color-success-light)',
-                            color: 'var(--color-success)',
-                            borderRadius: '999px',
-                          }}
-                        >
-                          {outcome}
-                        </span>
-                      ))}
-                    </div>
                   )}
                 </div>
 
@@ -301,19 +367,6 @@ const InteractionList: React.FC = () => {
           })}
         </div>
       )}
-
-      <Modal
-        open={formOpen}
-        onClose={() => { setFormOpen(false); setEditing(null); }}
-        title={editing ? 'Edit Interaction' : 'Record Interaction'}
-        width="520px"
-      >
-        <InteractionForm
-          interaction={editing}
-          onSuccess={() => { setFormOpen(false); setEditing(null); }}
-          onCancel={() => { setFormOpen(false); setEditing(null); }}
-        />
-      </Modal>
 
       <ConfirmDialog
         open={!!deleteTarget}

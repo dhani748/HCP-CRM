@@ -72,9 +72,13 @@ const HCPList: React.FC = () => {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    await dispatch(deleteHCP(deleteTarget.id));
-    dispatch(showToast({ message: 'HCP deleted successfully', type: 'success' }));
-    setDeleteTarget(null);
+    try {
+      await dispatch(deleteHCP(deleteTarget.id)).unwrap();
+      dispatch(showToast({ message: 'HCP deleted successfully', type: 'success' }));
+      setDeleteTarget(null);
+    } catch {
+      dispatch(showToast({ message: 'Failed to delete HCP', type: 'error' }));
+    }
   };
 
   const handleFormSuccess = () => {
@@ -108,7 +112,7 @@ const HCPList: React.FC = () => {
           style={{
             padding: '0.5rem 1rem',
             background: 'var(--color-primary)',
-            color: '#fff',
+            color: 'var(--color-text-inverse)',
             border: 'none',
             borderRadius: 'var(--radius)',
             fontWeight: 500,
@@ -186,7 +190,7 @@ const HCPList: React.FC = () => {
                 style={{
                   padding: '0.5rem 1rem',
                   background: 'var(--color-primary)',
-                  color: '#fff',
+                  color: 'var(--color-text-inverse)',
                   border: 'none',
                   borderRadius: 'var(--radius)',
                   fontWeight: 500,

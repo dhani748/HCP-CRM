@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import ChatMessage from '../../components/chat/ChatMessage';
-import ChatInput from '../../components/chat/ChatInput';
+import ChatInput from '../../components/ai/ChatInput';
 import TypingIndicator from '../../components/chat/TypingIndicator';
 import ErrorMessage from '../../components/ErrorMessage';
 import { useChat } from '../../hooks/chat/useChat';
@@ -12,10 +12,18 @@ const Assistant: React.FC = () => {
     loading,
     error,
     containerRef,
-    handleSend,
+    handleSend: sendMessage,
     handleRetry,
     handleClear,
   } = useChat();
+
+  const [input, setInput] = React.useState('');
+
+  const handleSend = useCallback(() => {
+    if (!input.trim() || loading) return;
+    sendMessage(input);
+    setInput('');
+  }, [input, loading, sendMessage]);
 
   return (
     <div style={{
@@ -48,7 +56,7 @@ const Assistant: React.FC = () => {
               fontWeight: 500,
             }}
           >
-            Clear chat
+            Clear
           </button>
         )}
       </div>
@@ -59,23 +67,25 @@ const Assistant: React.FC = () => {
           flex: 1,
           overflowY: 'auto',
           padding: '1rem 1.25rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.75rem',
         }}
       >
-        {messages.length === 0 && !error && (
+        {messages.length === 0 && !loading && (
           <div style={{
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
             height: '100%',
-            color: 'var(--color-text-muted)',
             textAlign: 'center',
             gap: '0.5rem',
           }}>
             <div style={{
               width: 48,
               height: 48,
-              borderRadius: 'var(--radius-lg)',
+              borderRadius: '50%',
               background: 'var(--color-primary-light)',
               display: 'flex',
               alignItems: 'center',
@@ -111,7 +121,12 @@ const Assistant: React.FC = () => {
         )}
       </div>
 
-      <ChatInput onSend={handleSend} disabled={loading} />
+      <ChatInput
+        value={input}
+        onChange={setInput}
+        onSend={handleSend}
+        disabled={loading}
+      />
     </div>
   );
 };

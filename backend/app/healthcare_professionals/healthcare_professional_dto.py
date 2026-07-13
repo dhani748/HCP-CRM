@@ -11,6 +11,7 @@ class HealthcareProfessionalBase(BaseModel):
     city: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
+    active: Optional[bool] = True
 
 
 class CreateHealthcareProfessionalRequest(HealthcareProfessionalBase):
@@ -26,6 +27,7 @@ class UpdateHealthcareProfessionalRequest(BaseModel):
     city: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
+    active: Optional[bool] = None
 
 
 class HealthcareProfessionalResponse(HealthcareProfessionalBase):

@@ -9,16 +9,20 @@ export interface UIState {
     type: 'success' | 'error' | 'info' | 'warning';
     visible: boolean;
   };
+  aiWidgetOpen: boolean;
+  aiUnreadCount: number;
 }
 
 const initialState: UIState = {
   sidebarOpen: false,
-  theme: 'light',
+  theme: 'dark',
   toast: {
     message: '',
     type: 'success',
     visible: false,
   },
+  aiWidgetOpen: false,
+  aiUnreadCount: 0,
 };
 
 const uiSlice = createSlice({
@@ -41,6 +45,25 @@ const uiSlice = createSlice({
     hideToast: (state) => {
       state.toast.visible = false;
     },
+    toggleAIWidget: (state) => {
+      state.aiWidgetOpen = !state.aiWidgetOpen;
+      if (state.aiWidgetOpen) {
+        state.aiUnreadCount = 0;
+      }
+    },
+    openAIWidget: (state) => {
+      state.aiWidgetOpen = true;
+      state.aiUnreadCount = 0;
+    },
+    closeAIWidget: (state) => {
+      state.aiWidgetOpen = false;
+    },
+    incrementAIUnread: (state) => {
+      state.aiUnreadCount += 1;
+    },
+    resetAIUnread: (state) => {
+      state.aiUnreadCount = 0;
+    },
   },
 });
 
@@ -49,6 +72,11 @@ export const {
   setTheme,
   showToast,
   hideToast,
+  toggleAIWidget,
+  openAIWidget,
+  closeAIWidget,
+  incrementAIUnread,
+  resetAIUnread,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

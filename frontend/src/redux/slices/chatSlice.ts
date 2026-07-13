@@ -1,67 +1,86 @@
-// frontend/src/redux/slices/chatSlice.ts
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { apiService } from '../../services/apiService';
+import type { ChatMessage } from '../../types';
+import type { RootState } from '../types';
+import { agentChatService } from '../../services/aiService';
+import type { AgentChatResponse } from '../../services/aiService';
 
 export interface ChatState {
-  messages: Array<{ role: 'user' | 'assistant'; content: string; timestamp: string }>;
-  currentChat: { hcpId?: string; hcpName?: string } | null;
+  messages: ChatMessage[];
   isTyping: boolean;
   loading: boolean;
   error: string | null;
+  unreadCount: number;
+  currentTool: string;
+  toolExecutionStatus: string;
+  toolOutput: Record<string, unknown> | null;
+  updatedFields: string[];
 }
 
 const initialState: ChatState = {
   messages: [],
-  currentChat: null,
   isTyping: false,
   loading: false,
   error: null,
+  unreadCount: 0,
+  currentTool: '',
+  toolExecutionStatus: '',
+  toolOutput: null,
+  updatedFields: [],
 };
 
-export const sendMessage = createAsyncThunk(
-  'chat/sendMessage',
-  async (message: string) => {
-    const response = await apiService.post<{ reply: string }>('/chat', { message });
-    return response.data;
+export const sendAgentMessage = createAsyncThunk<
+  AgentChatResponse,
+  string,
+  { rejectValue: string }
+>('chat/sendAgentMessage', async (message: string, { rejectWithValue }) => {
+  try {
+    const response = await agentChatService(message);
+    return response;
+  } catch (err) {
+    return rejectWithValue(err instanceof Error ? err.message : 'Failed to send message');
   }
-);
+});
 
 const chatSlice = createSlice({
   name: 'chat',
   initialState,
   reducers: {
-    setCurrentChat: (state, action: PayloadAction<{ hcpId?: string; hcpName?: string } | null>) => {
-      state.currentChat = action.payload;
-      state.messages = [];
-      state.error = null;
-    },
-    addMessage: (state, action: PayloadAction<{ role: 'user' | 'assistant'; content: string }>) => {
-      state.messages.push({
-        ...action.payload,
-        timestamp: new Date().toISOString(),
-      });
+    addMessage: (state, action: PayloadAction<ChatMessage>) => {
+      state.messages.push(action.payload);
     },
     clearChat: (state) => {
       state.messages = [];
-      state.currentChat = null;
-      state.isTyping = false;
       state.error = null;
+      state.currentTool = '';
+      state.toolExecutionStatus = '';
+      state.toolOutput = null;
+      state.updatedFields = [];
     },
     setTyping: (state, action: PayloadAction<boolean>) => {
       state.isTyping = action.payload;
     },
-    setError: (state, action: PayloadAction<string | null>) => {
-      state.error = action.payload;
+    resetUnread: (state) => {
+      state.unreadCount = 0;
+    },
+    resetToolState: (state) => {
+      state.currentTool = '';
+      state.toolExecutionStatus = '';
+      state.toolOutput = null;
+      state.updatedFields = [];
     },
   },
   extraReducers: (builder) => {
     builder
-      .addCase(sendMessage.pending, (state) => {
+      .addCase(sendAgentMessage.pending, (state) => {
         state.loading = true;
         state.isTyping = true;
         state.error = null;
+        state.currentTool = '';
+        state.toolExecutionStatus = 'thinking';
+        state.toolOutput = null;
+        state.updatedFields = [];
       })
-      .addCase(sendMessage.fulfilled, (state, action) => {
+      .addCase(sendAgentMessage.fulfilled, (state, action) => {
         state.loading = false;
         state.isTyping = false;
         state.messages.push({
@@ -69,21 +88,31 @@ const chatSlice = createSlice({
           content: action.payload.reply,
           timestamp: new Date().toISOString(),
         });
+        state.currentTool = action.payload.tool_executed;
+        state.toolExecutionStatus = action.payload.execution_status;
+        state.toolOutput = action.payload.tool_output as Record<string, unknown> | null;
+        state.updatedFields = action.payload.updated_fields || [];
+        state.unreadCount += 1;
       })
-      .addCase(sendMessage.rejected, (state, action) => {
+      .addCase(sendAgentMessage.rejected, (state, action) => {
         state.loading = false;
         state.isTyping = false;
-        state.error = action.error.message || 'Failed to send message';
+        state.error = action.payload || 'Failed to send message';
+        state.toolExecutionStatus = 'error';
       });
   },
 });
 
-export const {
-  setCurrentChat,
-  addMessage,
-  clearChat,
-  setTyping,
-  setError,
-} = chatSlice.actions;
+export const { addMessage, clearChat, setTyping, resetUnread, resetToolState } = chatSlice.actions;
+
+export const selectChatMessages = (state: RootState) => state.chat.messages;
+export const selectChatLoading = (state: RootState) => state.chat.loading;
+export const selectChatTyping = (state: RootState) => state.chat.isTyping;
+export const selectChatError = (state: RootState) => state.chat.error;
+export const selectChatUnread = (state: RootState) => state.chat.unreadCount;
+export const selectCurrentTool = (state: RootState) => state.chat.currentTool;
+export const selectToolExecutionStatus = (state: RootState) => state.chat.toolExecutionStatus;
+export const selectToolOutput = (state: RootState) => state.chat.toolOutput;
+export const selectUpdatedFields = (state: RootState) => state.chat.updatedFields;
 
 export default chatSlice.reducer;

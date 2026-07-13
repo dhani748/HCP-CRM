@@ -38,7 +38,7 @@ const ErrorMessage: React.FC<ErrorMessageProps> = ({ message, onRetry }) => {
           style={{
             padding: '0.5rem 1.25rem',
             background: 'var(--color-primary)',
-            color: '#fff',
+            color: 'var(--color-text-inverse)',
             border: 'none',
             borderRadius: 'var(--radius)',
             fontWeight: 500,

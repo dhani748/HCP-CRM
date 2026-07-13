@@ -24,7 +24,7 @@ const Pagination: React.FC<PaginationProps> = ({ current, total, pageSize, onCha
     border: active ? 'none' : '1px solid var(--color-border)',
     borderRadius: 'var(--radius)',
     background: active ? 'var(--color-primary)' : 'transparent',
-    color: active ? '#fff' : 'var(--color-text-muted)',
+    color: active ? 'var(--color-text-inverse)' : 'var(--color-text-muted)',
     fontSize: '0.875rem',
     fontWeight: active ? 500 : 400,
   });

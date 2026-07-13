@@ -1,4 +1,3 @@
-// frontend/src/redux/slices/interactionSlice.ts
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import type { Interaction } from '../../types';
 import type { RootState } from '../types';
@@ -29,9 +28,37 @@ function toSnakeCase(obj: Record<string, unknown>): Record<string, unknown> {
   return result;
 }
 
+export const EMPTY_INTERACTION: Partial<Interaction> = {
+  hcpName: '',
+  interactionType: 'visit',
+  interactionDate: '',
+  interactionTime: '',
+  attendees: '',
+  hospital: '',
+  specialization: '',
+  topicsDiscussed: '',
+  discussionNotes: '',
+  materialsShared: [],
+  samplesDistributed: [],
+  sentiment: 'neutral',
+  outcomes: '',
+  followUpActions: '',
+  followUpRequired: false,
+  followUpDate: '',
+  reminderDate: '',
+  priority: 'medium',
+  tags: [],
+  aiSuggestedFollowUp: '',
+  aiGeneratedSummary: '',
+  interactionStatus: 'draft',
+  toolUsed: '',
+  lastUpdated: '',
+  aiConfidenceScore: 0,
+};
+
 export interface InteractionState {
   interactions: Interaction[];
-  currentInteraction: Partial<Interaction> | null;
+  currentInteraction: Partial<Interaction>;
   loading: boolean;
   error: string | null;
   saving: boolean;
@@ -40,19 +67,48 @@ export interface InteractionState {
 
 const initialState: InteractionState = {
   interactions: [],
-  currentInteraction: null,
+  currentInteraction: { ...EMPTY_INTERACTION },
   loading: false,
   error: null,
   saving: false,
   selectedDate: new Date().toISOString().split('T')[0],
 };
 
+export const saveCurrentInteraction = createAsyncThunk<
+  Interaction,
+  void,
+  { state: RootState; rejectValue: string }
+>('interaction/saveCurrentInteraction', async (_, { getState, rejectWithValue }) => {
+  const state = getState();
+  const interaction = state.interaction.currentInteraction;
+  const session = state.editingSession;
+
+  const payload = toSnakeCase({ ...interaction } as Record<string, unknown>);
+
+  try {
+    if (session.mode === 'edit' && session.interactionId) {
+      const response = await apiService.put<Record<string, unknown>>(
+        `/interactions/${session.interactionId}`,
+        payload
+      );
+      return toCamelCase(response.data) as unknown as Interaction;
+    } else {
+      const response = await apiService.post<Record<string, unknown>>('/interactions', payload);
+      return toCamelCase(response.data) as unknown as Interaction;
+    }
+  } catch (err) {
+    return rejectWithValue(err instanceof Error ? err.message : 'Failed to save interaction');
+  }
+});
+
 export const fetchInteractions = createAsyncThunk(
   'interaction/fetchInteractions',
-  async (params?: { hcpId?: string; startDate?: string; endDate?: string }) => {
-    const queryParams = params?.hcpId
-      ? { ...params, healthcare_professional_id: Number(params.hcpId) }
-      : params;
+  async (params?: { hcpId?: string; startDate?: string; endDate?: string; status?: string; interactionType?: string }) => {
+    const queryParams: Record<string, unknown> = { ...params };
+    if (params?.hcpId) {
+      queryParams.healthcare_professional_id = Number(params.hcpId);
+      delete queryParams.hcpId;
+    }
     const response = await apiService.get<Record<string, unknown>[]>('/interactions', { params: queryParams });
     return response.data.map(item => toCamelCase(item) as unknown as Interaction);
   }
@@ -89,21 +145,29 @@ const interactionSlice = createSlice({
   initialState,
   reducers: {
     setCurrentInteraction: (state, action: PayloadAction<Partial<Interaction> | null>) => {
-      state.currentInteraction = action.payload;
+      state.currentInteraction = action.payload ?? { ...EMPTY_INTERACTION };
     },
     setSelectedDate: (state, action: PayloadAction<string>) => {
       state.selectedDate = action.payload;
     },
     resetForm: (state) => {
-      state.currentInteraction = null;
+      state.currentInteraction = { ...EMPTY_INTERACTION };
       state.error = null;
     },
-    setFormField: (
-      state,
-      action: PayloadAction<{ field: keyof Interaction; value: unknown }>
-    ) => {
-      if (state.currentInteraction) {
-        (state.currentInteraction as Record<string, unknown>)[action.payload.field] = action.payload.value;
+    updateInteractionFromTool: (state, action: PayloadAction<Record<string, unknown>>) => {
+      const data = action.payload;
+      for (const [key, value] of Object.entries(data)) {
+        if (value !== null && value !== undefined && key in state.currentInteraction) {
+          (state.currentInteraction as Record<string, unknown>)[key] = value;
+        }
+      }
+      state.currentInteraction.lastUpdated = new Date().toISOString();
+    },
+    setFormField: (state, action: PayloadAction<{ field: string; value: unknown }>) => {
+      const { field, value } = action.payload;
+      if (field in state.currentInteraction) {
+        (state.currentInteraction as Record<string, unknown>)[field] = value;
+        state.currentInteraction.lastUpdated = new Date().toISOString();
       }
     },
   },
@@ -127,7 +191,7 @@ const interactionSlice = createSlice({
       .addCase(createInteraction.fulfilled, (state, action) => {
         state.saving = false;
         state.interactions.unshift(action.payload);
-        state.currentInteraction = null;
+        state.currentInteraction = action.payload;
       })
       .addCase(createInteraction.rejected, (state, action) => {
         state.saving = false;
@@ -157,6 +221,24 @@ const interactionSlice = createSlice({
       .addCase(deleteInteraction.rejected, (state, action) => {
         state.saving = false;
         state.error = action.error.message || 'Failed to delete interaction';
+      })
+      .addCase(saveCurrentInteraction.pending, (state) => {
+        state.saving = true;
+        state.error = null;
+      })
+      .addCase(saveCurrentInteraction.fulfilled, (state, action) => {
+        state.saving = false;
+        state.currentInteraction = action.payload;
+        const idx = state.interactions.findIndex((i) => i.id === action.payload.id);
+        if (idx !== -1) {
+          state.interactions[idx] = action.payload;
+        } else {
+          state.interactions.unshift(action.payload);
+        }
+      })
+      .addCase(saveCurrentInteraction.rejected, (state, action) => {
+        state.saving = false;
+        state.error = action.payload as string || 'Failed to save interaction';
       });
   },
 });
@@ -165,6 +247,7 @@ export const {
   setCurrentInteraction,
   setSelectedDate,
   resetForm,
+  updateInteractionFromTool,
   setFormField,
 } = interactionSlice.actions;
 

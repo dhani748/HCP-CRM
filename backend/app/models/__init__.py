@@ -1,0 +1,2 @@
+from app.models.interaction import InteractionRecord
+from app.healthcare_professionals.healthcare_professional import HealthcareProfessional
