@@ -12,6 +12,8 @@ router = APIRouter(prefix="/api/v1/ai", tags=["AI Agent"])
 class ChatRequest(BaseModel):
     message: str
     editing_interaction_id: Optional[int] = None
+    draft_mode: bool = False
+    current_state: Optional[dict] = None
 
 
 class ChatResponse(BaseModel):
@@ -26,6 +28,20 @@ class ChatResponse(BaseModel):
     editing_interaction_id: Optional[int] = None
 
 
+def _build_response(result: dict) -> ChatResponse:
+    return ChatResponse(
+        reply=result.get("reply", ""),
+        tool_executed=result.get("tool_executed", "none"),
+        tool_output=result.get("tool_output"),
+        updated_fields=result.get("updated_fields", []),
+        interaction_state=result.get("interaction_state", {}),
+        search_results=result.get("search_results", []),
+        history_results=result.get("history_results", []),
+        execution_status=result.get("execution_status", "completed"),
+        editing_interaction_id=result.get("editing_interaction_id"),
+    )
+
+
 @router.post("/agent/chat", response_model=ChatResponse)
 async def agent_chat(
     payload: ChatRequest,
@@ -38,18 +54,10 @@ async def agent_chat(
         db,
         payload.message.strip(),
         editing_interaction_id=payload.editing_interaction_id,
+        draft_mode=payload.draft_mode,
+        current_state=payload.current_state,
     )
-    return ChatResponse(
-        reply=result.get("reply", ""),
-        tool_executed=result.get("tool_executed", "none"),
-        tool_output=result.get("tool_output"),
-        updated_fields=result.get("updated_fields", []),
-        interaction_state=result.get("interaction_state", {}),
-        search_results=result.get("search_results", []),
-        history_results=result.get("history_results", []),
-        execution_status=result.get("execution_status", "completed"),
-        editing_interaction_id=result.get("editing_interaction_id"),
-    )
+    return _build_response(result)
 
 
 @router.post("/agent/log-interaction", response_model=ChatResponse)
@@ -62,15 +70,7 @@ async def agent_log_interaction(
         db,
         wrapped,
         editing_interaction_id=payload.editing_interaction_id,
+        draft_mode=payload.draft_mode,
+        current_state=payload.current_state,
     )
-    return ChatResponse(
-        reply=result.get("reply", ""),
-        tool_executed=result.get("tool_executed", "none"),
-        tool_output=result.get("tool_output"),
-        updated_fields=result.get("updated_fields", []),
-        interaction_state=result.get("interaction_state", {}),
-        search_results=result.get("search_results", []),
-        history_results=result.get("history_results", []),
-        execution_status=result.get("execution_status", "completed"),
-        editing_interaction_id=result.get("editing_interaction_id"),
-    )
+    return _build_response(result)

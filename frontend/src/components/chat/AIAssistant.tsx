@@ -6,6 +6,7 @@ import { selectEditingSession, EditingMode } from '../../redux/slices/editingSes
 import ChatHeader from './ChatHeader';
 import SuggestedPromptCard from './SuggestedPromptCard';
 import ToolExecutionBadge from './ToolExecutionBadge';
+import ToolExecutionLog from './ToolExecutionLog';
 import ChatMessages from './ChatMessages';
 import ChatInput from './ChatInput';
 
@@ -31,7 +32,7 @@ const AIAssistant: React.FC = () => {
     if (mode === 'create') {
       dispatch(addMessage({
         role: 'assistant',
-        content: 'How would you like to log this interaction? Describe the HCP visit, call, or meeting and I will fill in the details.',
+        content: 'Describe the HCP interaction and I will populate the form for you in real time.',
         timestamp: new Date().toISOString(),
       }));
     } else if (mode === 'edit') {
@@ -54,18 +55,31 @@ const AIAssistant: React.FC = () => {
     });
 
     try {
-      const result = await dispatch(sendAgentMessage({ message: text, editingInteractionId })).unwrap();
+      // Pass current form state so the AI context stays synchronized for edits
+      const currentState = interaction as Record<string, unknown>;
+      const result = await dispatch(sendAgentMessage({
+        message: text,
+        editingInteractionId,
+        draftMode: true,
+        currentState,
+      })).unwrap();
+
       if (result.tool_executed !== 'none' && result.interaction_state) {
-        dispatch(updateInteractionFromTool(result.interaction_state as Record<string, unknown>));
+        dispatch(updateInteractionFromTool({
+          data: result.interaction_state as Record<string, unknown>,
+          updatedFields: result.updated_fields,
+        }));
       }
     } catch {
       // handled by slice
     }
-  }, [input, isTyping, dispatch]);
+  }, [input, isTyping, dispatch, interaction, editingInteractionId]);
 
   const handleClear = useCallback(() => {
     dispatch(clearChat());
   }, [dispatch]);
+
+  const showLog = toolStatus === 'thinking' || toolStatus === 'executing' || (toolStatus === 'completed' && updatedFields.length > 0);
 
   return (
     <div
@@ -88,6 +102,13 @@ const AIAssistant: React.FC = () => {
           updatedFields={updatedFields}
         />
       ) : null}
+      {showLog && (
+        <ToolExecutionLog
+          toolName={currentTool}
+          status={toolStatus}
+          updatedFields={updatedFields}
+        />
+      )}
       <ChatMessages messages={messages} isTyping={isTyping} />
       {error && (
         <div style={{

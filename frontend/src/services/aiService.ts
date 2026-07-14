@@ -45,10 +45,17 @@ export const extractHCP = async (text: string): Promise<ExtractedHCP> => {
   return response.data;
 };
 
-export const agentChatService = async (message: string, editingInteractionId?: number | null): Promise<AgentChatResponse> => {
+export const agentChatService = async (
+  message: string,
+  editingInteractionId?: number | null,
+  draftMode: boolean = false,
+  currentState?: Record<string, unknown> | null,
+): Promise<AgentChatResponse> => {
   const response = await apiService.post<AgentChatResponse>('/ai/agent/chat', {
     message,
     editing_interaction_id: editingInteractionId ?? null,
+    draft_mode: draftMode,
+    current_state: currentState ?? null,
   });
   return response.data;
 };

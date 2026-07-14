@@ -15,6 +15,7 @@ export interface ChatState {
   toolOutput: Record<string, unknown> | null;
   updatedFields: string[];
   editingInteractionId: number | null;
+  draftMode: boolean;
 }
 
 const initialState: ChatState = {
@@ -28,15 +29,16 @@ const initialState: ChatState = {
   toolOutput: null,
   updatedFields: [],
   editingInteractionId: null,
+  draftMode: false,
 };
 
 export const sendAgentMessage = createAsyncThunk<
   AgentChatResponse,
-  { message: string; editingInteractionId?: number | null },
+  { message: string; editingInteractionId?: number | null; draftMode?: boolean; currentState?: Record<string, unknown> | null },
   { rejectValue: string }
->('chat/sendAgentMessage', async ({ message, editingInteractionId }, { rejectWithValue }) => {
+>('chat/sendAgentMessage', async ({ message, editingInteractionId, draftMode, currentState }, { rejectWithValue }) => {
   try {
-    const response = await agentChatService(message, editingInteractionId);
+    const response = await agentChatService(message, editingInteractionId, draftMode ?? false, currentState);
     return response;
   } catch (err) {
     return rejectWithValue(err instanceof Error ? err.message : 'Failed to send message');
@@ -77,7 +79,7 @@ const chatSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(sendAgentMessage.pending, (state) => {
+      .addCase(sendAgentMessage.pending, (state, action) => {
         state.loading = true;
         state.isTyping = true;
         state.error = null;
@@ -85,6 +87,7 @@ const chatSlice = createSlice({
         state.toolExecutionStatus = 'thinking';
         state.toolOutput = null;
         state.updatedFields = [];
+        state.draftMode = action.meta.arg.draftMode ?? false;
       })
       .addCase(sendAgentMessage.fulfilled, (state, action) => {
         state.loading = false;

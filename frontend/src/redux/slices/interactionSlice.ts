@@ -154,13 +154,91 @@ const interactionSlice = createSlice({
       state.currentInteraction = { ...EMPTY_INTERACTION };
       state.error = null;
     },
-    updateInteractionFromTool: (state, action: PayloadAction<Record<string, unknown>>) => {
-      const data = action.payload;
-      for (const [key, value] of Object.entries(data)) {
-        if (value !== null && value !== undefined && key in state.currentInteraction) {
-          (state.currentInteraction as Record<string, unknown>)[key] = value;
+    updateInteractionFromTool: (state, action: PayloadAction<{ data: Record<string, unknown>; updatedFields?: string[] }>) => {
+      const { data, updatedFields } = action.payload;
+
+      // Backend field names (snake_case) -> Frontend field names (camelCase)
+      const fieldMap: Record<string, string> = {
+        hcp_name: 'hcpName',
+        interaction_date: 'interactionDate',
+        interaction_time: 'interactionTime',
+        interaction_type: 'interactionType',
+        hospital: 'hospital',
+        specialization: 'specialization',
+        products_discussed: 'topicsDiscussed',
+        discussion_notes: 'discussionNotes',
+        materials_shared: 'materialsShared',
+        samples_provided: 'samplesDistributed',
+        sentiment: 'sentiment',
+        priority: 'priority',
+        follow_up_required: 'followUpRequired',
+        follow_up_date: 'followUpDate',
+        reminder_date: 'reminderDate',
+        tags: 'tags',
+        attendees: 'attendees',
+        interaction_summary: 'aiGeneratedSummary',
+        interaction_status: 'interactionStatus',
+      };
+
+      const keysToProcess = updatedFields && updatedFields.length > 0
+        ? updatedFields
+        : Object.keys(data);
+
+      for (const key of keysToProcess) {
+        const value = data[key];
+        // Skip null/undefined
+        if (value === null || value === undefined) continue;
+        // Skip empty defaults that shouldn't overwrite existing values for edits
+        if (updatedFields && updatedFields.length > 0) {
+          if (Array.isArray(value) && value.length === 0) continue;
+          if (typeof value === 'string' && value.trim() === '') continue;
+          if (typeof value === 'number' && value === 0) continue;
+          if (typeof value === 'boolean' && value === false) continue;
+        }
+
+        const camelKey = fieldMap[key];
+        if (!camelKey) continue;
+
+        // Type conversions
+        if (camelKey === 'attendees' && Array.isArray(value)) {
+          (state.currentInteraction as Record<string, unknown>)[camelKey] = value.join(', ');
+          continue;
+        }
+        if (camelKey === 'topicsDiscussed' && Array.isArray(value)) {
+          (state.currentInteraction as Record<string, unknown>)[camelKey] = (value as string[]).join(', ');
+          continue;
+        }
+        if (camelKey === 'samplesDistributed') {
+          // Backend sends int or list; frontend expects string[]
+          if (typeof value === 'number' && value > 0) {
+            (state.currentInteraction as Record<string, unknown>)[camelKey] = [`${value} sample(s)`];
+            continue;
+          }
+          if (Array.isArray(value)) {
+            (state.currentInteraction as Record<string, unknown>)[camelKey] = value;
+            continue;
+          }
+          continue;
+        }
+        if (camelKey === 'followUpRequired' && typeof value === 'string') {
+          (state.currentInteraction as Record<string, unknown>)[camelKey] = value === 'true' || value === 'yes' || value === '1';
+          continue;
+        }
+
+        (state.currentInteraction as Record<string, unknown>)[camelKey] = value;
+      }
+
+      // Update outcomes/followUpActions from summary if present
+      if (data.interaction_summary && typeof data.interaction_summary === 'string') {
+        const summary = data.interaction_summary as string;
+        if (!(state.currentInteraction as Record<string, unknown>).outcomes) {
+          (state.currentInteraction as Record<string, unknown>).outcomes = summary;
+        }
+        if (!(state.currentInteraction as Record<string, unknown>).aiGeneratedSummary) {
+          (state.currentInteraction as Record<string, unknown>).aiGeneratedSummary = summary;
         }
       }
+
       state.currentInteraction.lastUpdated = new Date().toISOString();
     },
     setFormField: (state, action: PayloadAction<{ field: string; value: unknown }>) => {

@@ -39,6 +39,8 @@ class AgentState(BaseModel):
     reply: str = ""
     editing_interaction_id: Optional[int] = None
     conversation_history: list[dict] = []
+    draft_mode: bool = False
+    current_state: Optional[dict] = None
 
 
 INTENT_SYSTEM_PROMPT = f"""You are an AI CRM assistant for Healthcare Professional interactions.
@@ -136,7 +138,7 @@ Rules:
 - If failed, apologize and suggest next steps"""
 
 
-def create_agent(db: Session, editing_interaction_id: Optional[int] = None):
+def create_agent(db: Session, editing_interaction_id: Optional[int] = None, draft_mode: bool = False, current_state: Optional[dict] = None):
     api_key = os.environ.get("GROQ_API_KEY")
     if not api_key:
         raise ValueError("GROQ_API_KEY environment variable not set")
@@ -184,10 +186,103 @@ def create_agent(db: Session, editing_interaction_id: Optional[int] = None):
         state.execution_status = "intent_detected"
         return state
 
+    def _build_draft_log_state(params: dict) -> InteractionState:
+        """Build InteractionState from extracted params without touching DB."""
+        today = date.today().isoformat()
+        products = params.get("products_discussed", [])
+        if isinstance(products, str):
+            products = [p.strip() for p in products.split(",") if p.strip()]
+        materials = params.get("materials_shared", [])
+        if isinstance(materials, str):
+            materials = [m.strip() for m in materials.split(",") if m.strip()]
+        tags = params.get("tags", [])
+        if isinstance(tags, str):
+            tags = [t.strip() for t in tags.split(",") if t.strip()]
+        attendees = params.get("attendees", [])
+        if isinstance(attendees, str):
+            attendees = [a.strip() for a in attendees.split(",") if a.strip()]
+
+        return InteractionState(
+            hcp_name=params.get("hcp_name", ""),
+            interaction_date=params.get("interaction_date", today),
+            interaction_time=params.get("interaction_time", ""),
+            interaction_type=params.get("interaction_type", "visit"),
+            hospital=params.get("hospital", ""),
+            specialization=params.get("specialization", ""),
+            products_discussed=products,
+            discussion_notes=params.get("discussion_notes", ""),
+            materials_shared=materials,
+            samples_provided=params.get("samples_provided", 0),
+            sentiment=params.get("sentiment", "neutral"),
+            priority=params.get("priority", "medium"),
+            follow_up_required=params.get("follow_up_required", False),
+            follow_up_date=params.get("follow_up_date", ""),
+            tags=tags,
+            attendees=attendees,
+            interaction_summary=params.get("interaction_summary", ""),
+            created_by="AI Assistant",
+            tool_used="log_interaction",
+            interaction_status="draft",
+        )
+
+    def _build_draft_edit_state(params: dict) -> tuple[InteractionState, list[str]]:
+        """Build a sparse InteractionState for edits without DB touch."""
+        allowed = {
+            "interaction_type", "hospital", "specialization", "products_discussed",
+            "discussion_notes", "materials_shared", "samples_provided",
+            "sentiment", "priority", "follow_up_required", "follow_up_date",
+            "tags", "interaction_summary", "interaction_status", "hcp_name",
+            "interaction_time", "attendees", "interaction_date",
+        }
+        filtered: dict = {}
+        updated_fields: list[str] = []
+        for k, v in params.items():
+            if k in allowed and v is not None:
+                if k in ("products_discussed", "materials_shared", "tags", "attendees"):
+                    if isinstance(v, str):
+                        v = [x.strip() for x in v.split(",") if x.strip()]
+                    elif not isinstance(v, list):
+                        v = [str(v)] if v else []
+                filtered[k] = v
+                updated_fields.append(k)
+        return InteractionState(**filtered), updated_fields
+
     async def execute_tool_node(state: AgentState) -> AgentState:
         tool = state.tool_name
         params = state.tool_params
-        logger.info(f"execute_tool: tool={tool} params={json.dumps(params, default=str)}")
+        logger.info(f"execute_tool: tool={tool} draft={state.draft_mode} params={json.dumps(params, default=str)}")
+
+        # DRAFT MODE: do not touch DB for log/edit intents, just return structured state
+        if state.draft_mode and tool in ("log_interaction", "edit_interaction"):
+            try:
+                if tool == "log_interaction":
+                    istate = _build_draft_log_state(params)
+                    state.tool_output = ToolOutput(
+                        tool_name="log_interaction",
+                        success=True,
+                        message=f"Extracted interaction details for {istate.hcp_name or 'the HCP'}.",
+                        interaction_state=istate,
+                        updated_fields=[k for k, v in istate.model_dump().items() if v not in (None, "", [], 0, False)],
+                    )
+                elif tool == "edit_interaction":
+                    istate, updated_fields = _build_draft_edit_state(params)
+                    state.tool_output = ToolOutput(
+                        tool_name="edit_interaction",
+                        success=True,
+                        message=f"Prepared {len(updated_fields)} field update(s)." if updated_fields else "No changes detected.",
+                        interaction_state=istate,
+                        updated_fields=updated_fields,
+                    )
+            except Exception as e:
+                logger.error(f"execute_tool: Draft mode error in {tool}: {e}", exc_info=True)
+                state.tool_output = ToolOutput(
+                    tool_name=tool,
+                    success=False,
+                    message="Failed to extract interaction details.",
+                    interaction_state=InteractionState(),
+                )
+            state.execution_status = "tool_executed"
+            return state
 
         try:
             if tool == "log_interaction":
@@ -318,13 +413,22 @@ async def run_agent(
     db: Session,
     user_input: str,
     editing_interaction_id: Optional[int] = None,
+    draft_mode: bool = False,
+    current_state: Optional[dict] = None,
 ) -> dict:
-    agent = create_agent(db, editing_interaction_id=editing_interaction_id)
+    agent = create_agent(
+        db,
+        editing_interaction_id=editing_interaction_id,
+        draft_mode=draft_mode,
+        current_state=current_state,
+    )
 
     initial_state = AgentState(
         user_input=user_input,
         editing_interaction_id=editing_interaction_id,
         execution_status="pending",
+        draft_mode=draft_mode,
+        current_state=current_state,
     )
 
     try:
